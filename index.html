@@ -2,108 +2,200 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Speedtest Mini App</title>
-    <!-- Подключаем скрипты -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SpeedTest Mini App</title>
+    <!-- Подключаем Telegram и Chart.js -->
     <script src="https://telegram.org"></script>
     <script src="https://cdn.jsdelivr.net"></script>
     <style>
+        :root {
+            --bg-dark: #0f172a;
+            --accent: #00d2ff;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--tg-theme-bg-color, #1c1c1e);
-            color: var(--tg-theme-text-color, #ffffff);
+            background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+            color: white;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
-            margin: 0;
             overflow: hidden;
         }
-        .container { text-align: center; width: 90%; }
-        .speed-value { font-size: 4rem; font-weight: bold; margin: 10px 0; color: #34c759; }
-        .unit { font-size: 1.5rem; color: #8e8e93; }
-        canvas { max-width: 100%; margin-top: 20px; }
-        button {
-            background-color: var(--tg-theme-button-color, #007aff);
-            color: var(--tg-theme-button-text-color, #ffffff);
-            border: none;
-            padding: 15px 30px;
-            border-radius: 12px;
-            font-size: 1.2rem;
-            cursor: pointer;
-            margin-top: 20px;
+
+        /* Спидометр */
+        .gauge-container {
+            position: relative;
+            width: 280px;
+            height: 280px;
         }
+
+        svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+        
+        .circle-bg { fill: none; stroke: var(--glass); stroke-width: 12; }
+        
+        .circle-fill {
+            fill: none; stroke: var(--accent); stroke-width: 12;
+            stroke-linecap: round; stroke-dasharray: 690; stroke-dashoffset: 690;
+            transition: stroke-dashoffset 0.3s ease;
+            filter: drop-shadow(0 0 12px var(--accent));
+        }
+
+        .speed-info {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        #speed-num { font-size: 3.5rem; font-weight: 800; margin: 0; color: var(--accent); text-shadow: 0 0 20px rgba(0,210,255,0.3); }
+        .unit { font-size: 1rem; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* График */
+        .chart-card {
+            width: 85%;
+            height: 130px;
+            margin-top: 30px;
+            background: var(--glass);
+            border-radius: 20px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Кнопка */
+        .btn {
+            margin-top: 40px;
+            padding: 18px 70px;
+            border-radius: 50px;
+            border: none;
+            background: var(--accent);
+            color: #020617;
+            font-size: 1.1rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(0, 210, 255, 0.3);
+            transition: 0.2s;
+            text-transform: uppercase;
+        }
+
+        .btn:active { transform: scale(0.96); opacity: 0.9; }
+        .btn:disabled { background: #334155; box-shadow: none; color: #94a3b8; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="unit">Загрузка</div>
-    <div class="speed-value" id="speed">0.0</div>
-    <div class="unit">Mbps</div>
-    
-    <canvas id="speedChart"></canvas>
-    
-    <button id="startBtn">Начать тест</button>
-</div>
+    <div class="gauge-container">
+        <svg viewBox="0 0 240 240">
+            <circle class="circle-bg" cx="120" cy="120" r="110"></circle>
+            <circle id="progress" class="circle-fill" cx="120" cy="120" r="110"></circle>
+        </svg>
+        <div class="speed-info">
+            <div id="speed-num">0.0</div>
+            <div class="unit">Mbps</div>
+        </div>
+    </div>
 
-<script>
-    // Инициализация Telegram Web App
-    const tg = window.Telegram.WebApp;
-    tg.expand(); // Развернуть на всё окно
+    <div class="chart-card">
+        <canvas id="speedChart"></canvas>
+    </div>
 
-    const speedEl = document.getElementById('speed');
-    const startBtn = document.getElementById('startBtn');
-    const ctx = document.getElementById('speedChart').getContext('2d');
+    <button class="btn" id="startBtn" onclick="runTest()">Старт</button>
 
-    // Настройка графика
-    let chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: 'Mbps',
-                data: [],
-                borderColor: '#34c759',
-                tension: 0.4,
-                fill: true,
-                backgroundColor: 'rgba(52, 199, 89, 0.1)'
-            }]
-        },
-        options: {
-            scales: { y: { beginAtZero: true }, x: { display: false } },
-            plugins: { legend: { display: false } }
-        }
-    });
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
 
-    // Функция теста (симуляция реального замера)
-    async function runTest() {
-        startBtn.disabled = true;
-        startBtn.innerText = "Тестирование...";
-        chart.data.labels = [];
-        chart.data.datasets[0].data = [];
-        
-        for (let i = 0; i < 20; i++) {
-            await new Promise(r => setTimeout(r, 100));
-            // Генерируем случайную скорость (здесь можно вставить fetch большого файла)
-            const currentSpeed = (Math.random() * (350 - 300) + 300).toFixed(1);
+        let stats = [];
+        let speedChart;
+
+        // Инициализация графика при загрузке
+        window.onload = () => {
+            const ctx = document.getElementById('speedChart').getContext('2d');
+            speedChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array(20).fill(''),
+                    datasets: [{
+                        data: stats,
+                        borderColor: '#00d2ff',
+                        borderWidth: 3,
+                        fill: true,
+                        backgroundColor: 'rgba(0, 210, 255, 0.05)',
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { display: false }, y: { display: false } }
+                }
+            });
+        };
+
+        function updateUI(mbps) {
+            // Защита от некорректных чисел
+            if (!isFinite(mbps) || mbps < 0) return;
+
+            const display = document.getElementById('speed-num');
+            const circle = document.getElementById('progress');
             
-            speedEl.innerText = currentSpeed;
-            chart.data.labels.push("");
-            chart.data.datasets[0].data.push(currentSpeed);
-            chart.update();
+            display.innerText = mbps.toFixed(1);
+            
+            // 690 - это длина окружности (2 * PI * 110)
+            const offset = 690 - (Math.min(mbps, 100) / 100) * 690;
+            circle.style.strokeDashoffset = offset;
+
+            stats.push(mbps);
+            if (stats.length > 20) stats.shift();
+            speedChart.update('none');
         }
 
-        startBtn.disabled = false;
-        startBtn.innerText = "Повторить тест";
-        
-        // Вибрация по завершении
-        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-    }
+        async function runTest() {
+            const btn = document.getElementById('startBtn');
+            btn.disabled = true;
+            btn.innerText = "Замер...";
+            
+            stats.length = 0; // Сброс графика
+            updateUI(0);
 
-    startBtn.onclick = runTest;
-</script>
+            try {
+                // Добавляем случайный параметр, чтобы GitHub не брал файл из кеша
+                const testUrl = "test.bin?nocache=" + Math.random();
+                const response = await fetch(testUrl);
+                const reader = response.body.getReader();
+                const startTime = performance.now();
+                let received = 0;
 
+                while(true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    received += value.length;
+                    
+                    const now = performance.now();
+                    const duration = (now - startTime) / 1000;
+
+                    // Считаем только если прошло больше 100мс, чтобы избежать Infinity
+                    if (duration > 0.1) {
+                        const mbps = (received * 8 / (1024 * 1024)) / duration;
+                        updateUI(mbps);
+                    }
+                }
+            } catch (e) {
+                alert("Ошибка: Не удалось загрузить test.bin. Проверьте путь к файлу.");
+                console.error(e);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Повторить";
+            }
+        }
+    </script>
 </body>
 </html>
