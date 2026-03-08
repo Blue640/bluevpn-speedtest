@@ -6,227 +6,103 @@
     <title>BlueVPN Speedtest</title>
     <script src="https://telegram.org"></script>
     <style>
-        :root {
-            --bg: #0b0e14;
-            --accent: #00d1ff;
-            --text: #ffffff;
-            --secondary: #1f262f;
-        }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            overflow: hidden;
-        }
-
-        /* Спидометр */
-        .gauge-wrapper {
-            position: relative;
-            width: 280px;
-            height: 280px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .gauge-svg {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            transform: rotate(-90deg);
-        }
-        .gauge-bg {
-            fill: none;
-            stroke: var(--secondary);
-            stroke-width: 12;
-        }
-        .gauge-progress {
-            fill: none;
-            stroke: var(--accent);
-            stroke-width: 12;
-            stroke-linecap: round;
-            stroke-dasharray: 628; /* 2 * PI * 100 */
-            stroke-dashoffset: 628;
-            transition: stroke-dashoffset 0.1s linear;
-        }
-        .speed-info {
-            text-align: center;
-            z-index: 2;
-        }
-        #speedText {
-            font-size: 4.5rem;
-            font-weight: 900;
-            line-height: 1;
-            display: block;
-        }
-        .unit {
-            color: #5a6575;
-            font-size: 1.2rem;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-
-        /* Статистика (Ping/Jitter) */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            width: 100%;
-            max-width: 300px;
-            margin-top: 30px;
-        }
-        .stat-item {
-            background: var(--secondary);
-            padding: 12px;
-            border-radius: 15px;
-            text-align: center;
-        }
-        .stat-label { font-size: 0.7rem; color: #5a6575; text-transform: uppercase; margin-bottom: 4px; }
-        .stat-value { font-size: 1.1rem; font-weight: bold; }
-
-        /* Кнопка */
-        .btn-main {
-            margin-top: 50px;
-            background: var(--accent);
-            color: #000;
-            border: none;
-            width: 200px;
-            height: 60px;
-            border-radius: 30px;
-            font-size: 1.1rem;
-            font-weight: 800;
-            cursor: pointer;
-            box-shadow: 0 0 30px rgba(0, 209, 255, 0.2);
-            transition: transform 0.1s, box-shadow 0.3s;
-        }
-        .btn-main:active { transform: scale(0.95); }
-        .btn-main:disabled { background: #333; color: #666; box-shadow: none; cursor: not-allowed; }
-
-        /* Лог ошибок */
-        #status {
-            margin-top: 20px;
-            font-size: 0.8rem;
-            color: #444;
-            height: 20px;
-        }
+        :root { --bg: #0b0e14; --accent: #00d1ff; --text: #ffffff; --sec: #1f262f; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; overflow: hidden; }
+        .gauge { position: relative; width: 260px; height: 260px; display: flex; align-items: center; justify-content: center; border: 4px solid var(--sec); border-radius: 50%; }
+        #speedText { font-size: 4.5rem; font-weight: 900; color: var(--accent); }
+        .unit { color: #5a6575; font-size: 1.2rem; position: absolute; bottom: 60px; }
+        .stats { display: flex; gap: 15px; margin-top: 30px; }
+        .stat-card { background: var(--sec); padding: 10px 25px; border-radius: 12px; text-align: center; min-width: 100px; }
+        .stat-label { font-size: 0.7rem; color: #5a6575; text-transform: uppercase; }
+        .stat-val { font-size: 1.1rem; font-weight: bold; display: block; }
+        .btn { margin-top: 40px; background: var(--accent); color: #000; border: none; padding: 18px 70px; border-radius: 35px; font-weight: 900; font-size: 1rem; cursor: pointer; transition: 0.2s; }
+        .btn:disabled { background: #333; color: #666; }
+        #log { margin-top: 15px; font-size: 0.7rem; color: #444; }
     </style>
 </head>
 <body>
 
-    <div class="gauge-wrapper">
-        <svg class="gauge-svg" viewBox="0 0 220 220">
-            <circle class="gauge-bg" cx="110" cy="110" r="100"></circle>
-            <circle id="progressCircle" class="gauge-progress" cx="110" cy="110" r="100"></circle>
-        </svg>
-        <div class="speed-info">
-            <span id="speedText">0.0</span>
-            <div class="unit">Mbps</div>
+    <div class="gauge">
+        <span id="speedText">0.0</span>
+        <div class="unit">Mbps</div>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <span class="stat-label">Ping</span>
+            <span class="stat-val" id="p">0 <small>ms</small></span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Jitter</span>
+            <span class="stat-val" id="j">0 <small>ms</small></span>
         </div>
     </div>
 
-    <div class="stats-grid">
-        <div class="stat-item">
-            <div class="stat-label">Ping</div>
-            <div class="stat-value"><span id="pingVal">—</span> <small>ms</small></div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-label">Jitter</div>
-            <div class="stat-value"><span id="jitterVal">—</span> <small>ms</small></div>
-        </div>
-    </div>
-
-    <button class="btn-main" id="startBtn">START</button>
-    <div id="status">Ready</div>
+    <button class="btn" id="go">START</button>
+    <div id="log">Ready</div>
 
 <script>
     const tg = window.Telegram ? window.Telegram.WebApp : null;
-    const startBtn = document.getElementById('startBtn');
-    const speedText = document.getElementById('speedText');
-    const progressCircle = document.getElementById('progressCircle');
-    const status = document.getElementById('status');
-    const pingVal = document.getElementById('pingVal');
-    const jitterVal = document.getElementById('jitterVal');
+    const btn = document.getElementById('go');
+    const log = document.getElementById('log');
 
-    if (tg) { tg.expand(); tg.ready(); }
-
-    function updateGauge(mbps) {
-        const maxSpeed = 300; // На сколько Mbps рассчитан круг
-        const percent = Math.min(mbps / maxSpeed, 1);
-        const offset = 628 - (628 * percent);
-        progressCircle.style.strokeDashoffset = offset;
-    }
-
+    // Функция Пинга (уже работает, оставляем)
     async function getPing() {
-        const samples = [];
-        for (let i = 0; i < 5; i++) {
-            const start = performance.now();
-            try {
-                // Пингуем сам файл заголовком HEAD
-                await fetch("test10mb.bin", { method: 'HEAD', cache: 'no-store' });
-                samples.push(performance.now() - start);
-            } catch (e) { samples.push(0); }
+        const starts = [];
+        for(let i=0; i<4; i++) {
+            const s = performance.now();
+            await fetch("test10mb.bin", {method:'HEAD', cache:'no-store'}).catch(()=>{});
+            starts.push(performance.now()-s);
         }
-        const avgPing = samples.reduce((a, b) => a + b) / samples.length;
-        const jitter = Math.max(...samples) - Math.min(...samples);
-        return { ping: avgPing.toFixed(0), jitter: jitter.toFixed(0) };
+        return { 
+            p: (starts.reduce((a,b)=>a+b)/4).toFixed(0),
+            j: (Math.max(...starts)-Math.min(...starts)).toFixed(0)
+        };
     }
 
-    async function runTest() {
-        startBtn.disabled = true;
-        startBtn.innerText = "WAIT...";
-        status.innerText = "Checking latency...";
-        status.style.color = "#444";
+    btn.onclick = async function() {
+        btn.disabled = true;
+        btn.innerText = "TESTING...";
+        log.innerText = "Measuring latency...";
 
-        // 1. Пинг
-        const latency = await getPing();
-        pingVal.innerText = latency.ping;
-        jitterVal.innerText = latency.jitter;
+        const lat = await getPing();
+        document.getElementById('p').innerHTML = lat.p + " <small>ms</small>";
+        document.getElementById('j').innerHTML = lat.j + " <small>ms</small>";
 
-        // 2. Загрузка
-        status.innerText = "Downloading...";
-        const TEST_FILE = "test10mb.bin";
+        log.innerText = "Downloading test file...";
+        
+        const xhr = new XMLHttpRequest();
         const startTime = performance.now();
         
-        try {
-            const response = await fetch(TEST_FILE + "?nocache=" + Math.random());
-            if (!response.ok) throw new Error("File not found (404)");
-
-            const reader = response.body.getReader();
-            let received = 0;
-
-            while (true) {
-                const {done, value} = await reader.read();
-                if (done) break;
-                
-                received += value.length;
-                const duration = (performance.now() - startTime) / 1000;
-                if (duration > 0) {
-                    const mbps = ((received * 8) / (1024 * 1024) / duration);
-                    speedText.innerText = mbps.toFixed(1);
-                    updateGauge(mbps);
-                }
-            }
-            
-            status.innerText = "Test completed";
-            startBtn.innerText = "RETRY";
-            if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-
-        } catch (e) {
-            status.innerText = "Error: " + e.message;
-            status.style.color = "#ff4d4d";
-            startBtn.innerText = "ERROR";
-        }
+        // Используем случайный параметр против кэша
+        xhr.open("GET", "test10mb.bin?v=" + Math.random(), true);
         
-        startBtn.disabled = false;
-    }
+        xhr.onprogress = function(e) {
+            if (e.lengthComputable || e.loaded > 0) {
+                const now = performance.now();
+                const duration = (now - startTime) / 1000;
+                const mbps = ((e.loaded * 8) / (1024 * 1024) / duration).toFixed(1);
+                document.getElementById('speedText').innerText = mbps;
+            }
+        };
 
-    startBtn.onclick = runTest;
+        xhr.onload = function() {
+            log.innerText = "Done!";
+            btn.innerText = "RETRY";
+            btn.disabled = false;
+            if(tg) tg.HapticFeedback.notificationOccurred('success');
+        };
+
+        xhr.onerror = function() {
+            log.innerText = "Error: Connection blocked";
+            btn.innerText = "ERROR";
+            btn.disabled = false;
+        };
+
+        xhr.send();
+    };
+
+    if(tg) { tg.expand(); tg.ready(); }
 </script>
 </body>
 </html>
