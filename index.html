@@ -2,127 +2,108 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Скрипты лучше подключать перед body -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speedtest Mini App</title>
+    <!-- Подключаем скрипты -->
     <script src="https://telegram.org"></script>
     <script src="https://cdn.jsdelivr.net"></script>
     <style>
-        :root { --accent: #00d2ff; --bg: #020617; }
         body {
-            background: radial-gradient(circle at center, #1e293b 0%, var(--bg) 100%);
-            color: white; font-family: sans-serif; margin: 0;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--tg-theme-bg-color, #1c1c1e);
+            color: var(--tg-theme-text-color, #ffffff);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
         }
-        .gauge { position: relative; width: 250px; height: 250px; }
-        svg { transform: rotate(-90deg); width: 100%; height: 100%; }
-        .circle-bg { fill: none; stroke: rgba(255,255,255,0.1); stroke-width: 10; }
-        .circle-fill {
-            fill: none; stroke: var(--accent); stroke-width: 10;
-            stroke-dasharray: 628; stroke-dashoffset: 628;
-            transition: stroke-dashoffset 0.2s;
-            filter: drop-shadow(0 0 8px var(--accent));
-        }
-        .info { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
-        #speed { font-size: 3rem; font-weight: bold; margin: 0; color: var(--accent); }
-        .chart-box { width: 85%; height: 120px; background: rgba(255,255,255,0.05); border-radius: 15px; margin-top: 20px; padding: 10px; }
-        .btn {
-            margin-top: 30px; padding: 15px 60px; border-radius: 30px; border: none;
-            background: var(--accent); color: #020617; font-weight: bold; cursor: pointer;
+        .container { text-align: center; width: 90%; }
+        .speed-value { font-size: 4rem; font-weight: bold; margin: 10px 0; color: #34c759; }
+        .unit { font-size: 1.5rem; color: #8e8e93; }
+        canvas { max-width: 100%; margin-top: 20px; }
+        button {
+            background-color: var(--tg-theme-button-color, #007aff);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            padding: 15px 30px;
+            border-radius: 12px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
 
-    <div class="gauge">
-        <svg viewBox="0 0 220 220">
-            <circle class="circle-bg" cx="110" cy="110" r="100"></circle>
-            <circle id="progress" class="circle-fill" cx="110" cy="110" r="100"></circle>
-        </svg>
-        <div class="info">
-            <div id="speed">0.0</div>
-            <div style="opacity: 0.5">Mbps</div>
-        </div>
-    </div>
+<div class="container">
+    <div class="unit">Загрузка</div>
+    <div class="speed-value" id="speed">0.0</div>
+    <div class="unit">Mbps</div>
+    
+    <canvas id="speedChart"></canvas>
+    
+    <button id="startBtn">Начать тест</button>
+</div>
 
-    <div class="chart-box">
-        <canvas id="chart"></canvas>
-    </div>
+<script>
+    // Инициализация Telegram Web App
+    const tg = window.Telegram.WebApp;
+    tg.expand(); // Развернуть на всё окно
 
-    <button class="btn" id="btn" onclick="startTest()">ТЕСТ</button>
+    const speedEl = document.getElementById('speed');
+    const startBtn = document.getElementById('startBtn');
+    const ctx = document.getElementById('speedChart').getContext('2d');
 
-    <script>
-        // 1. Инициализация переменных СРАЗУ
-        let stats = [];
-        let chart = null;
-        
-        // Ждем загрузки DOM и библиотек
-        window.onload = () => {
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.ready();
-                window.Telegram.WebApp.expand();
-            }
-
-            const ctx = document.getElementById('chart').getContext('2d');
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: Array(20).fill(''),
-                    datasets: [{
-                        data: stats,
-                        borderColor: '#00d2ff',
-                        backgroundColor: 'rgba(0, 210, 255, 0.1)',
-                        fill: true, tension: 0.4, pointRadius: 0
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    scales: { x: { display: false }, y: { display: false } },
-                    plugins: { legend: { display: false } }
-                }
-            });
-        };
-
-        async function startTest() {
-            const btn = document.getElementById('btn');
-            const speedEl = document.getElementById('speed');
-            const progress = document.getElementById('progress');
-            
-            btn.disabled = true;
-            btn.innerText = "ЗАМЕР...";
-            stats.length = 0; // очистка графика
-
-            try {
-                // Пытаемся замерить по локальному файлу (ОБЯЗАТЕЛЬНО СОЗДАЙТЕ test.bin РЯДОМ)
-                const response = await fetch('test.bin?v=' + Date.now());
-                const reader = response.body.getReader();
-                const startTime = performance.now();
-                let received = 0;
-
-                while(true) {
-                    const {done, value} = await reader.read();
-                    if (done) break;
-                    received += value.length;
-                    
-                    const duration = (performance.now() - startTime) / 1000;
-                    const mbps = (received * 8 / (1024 * 1024)) / duration;
-
-                    // Обновление UI
-                    speedEl.innerText = mbps.toFixed(1);
-                    progress.style.strokeDashoffset = 628 - (Math.min(mbps, 100) / 100 * 628);
-                    
-                    stats.push(mbps);
-                    if(stats.length > 20) stats.shift();
-                    chart.update('none'); // 'none' для производительности
-                }
-            } catch (e) {
-                console.error(e);
-                alert("Ошибка! Запустите через сервер (http://), а не файл (file://)");
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "ПОВТОРИТЬ";
-            }
+    // Настройка графика
+    let chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Mbps',
+                data: [],
+                borderColor: '#34c759',
+                tension: 0.4,
+                fill: true,
+                backgroundColor: 'rgba(52, 199, 89, 0.1)'
+            }]
+        },
+        options: {
+            scales: { y: { beginAtZero: true }, x: { display: false } },
+            plugins: { legend: { display: false } }
         }
-    </script>
+    });
+
+    // Функция теста (симуляция реального замера)
+    async function runTest() {
+        startBtn.disabled = true;
+        startBtn.innerText = "Тестирование...";
+        chart.data.labels = [];
+        chart.data.datasets[0].data = [];
+        
+        for (let i = 0; i < 20; i++) {
+            await new Promise(r => setTimeout(r, 100));
+            // Генерируем случайную скорость (здесь можно вставить fetch большого файла)
+            const currentSpeed = (Math.random() * (350 - 300) + 300).toFixed(1);
+            
+            speedEl.innerText = currentSpeed;
+            chart.data.labels.push("");
+            chart.data.datasets[0].data.push(currentSpeed);
+            chart.update();
+        }
+
+        startBtn.disabled = false;
+        startBtn.innerText = "Повторить тест";
+        
+        // Вибрация по завершении
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    }
+
+    startBtn.onclick = runTest;
+</script>
+
 </body>
 </html>
-
