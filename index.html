@@ -6,169 +6,63 @@
     <title>BlueVPN Speedtest</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { 
-            --bg: #0b0e14; 
-            --accent: #00d1ff; 
-            --text: #ffffff; 
-            --sec: #1f262f; 
-        }
-        
+        :root { --bg: #0b0e14; --accent: #00d1ff; --text: #ffffff; --sec: #1f262f; }
         body { 
-            background-color: var(--bg); 
-            color: var(--text); 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            min-height: 100vh; 
-            margin: 0; 
-            padding: 20px; 
-            overflow: hidden; 
-            user-select: none;
+            background-color: var(--bg); color: var(--text); 
+            font-family: sans-serif; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; min-height: 100vh; 
+            margin: 0; padding: 20px; overflow: hidden; 
         }
-
-        /* Спидометр */
-        .gauge-wrapper { 
-            position: relative; 
-            width: 280px; 
-            height: 160px; 
-            display: flex; 
-            align-items: flex-end; 
-            justify-content: center; 
-            overflow: hidden; 
-        }
-        
-        .gauge-bg { 
-            position: absolute; 
-            width: 240px; 
-            height: 240px; 
-            border: 15px solid var(--sec); 
-            border-radius: 50%; 
-            border-bottom-color: transparent; 
-            top: 0; 
-            transform: rotate(-45deg); 
-        }
-        
+        .gauge-wrapper { position: relative; width: 280px; height: 160px; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
+        .gauge-bg { position: absolute; width: 240px; height: 240px; border: 15px solid var(--sec); border-radius: 50%; border-bottom-color: transparent; top: 0; transform: rotate(-45deg); }
         .gauge-fill { 
-            position: absolute; 
-            width: 240px; 
-            height: 240px; 
-            border: 15px solid var(--accent); 
-            border-radius: 50%; 
-            border-bottom-color: transparent; 
-            border-left-color: transparent; 
-            border-right-color: transparent; 
-            top: 0; 
-            transform: rotate(-135deg); 
-            transition: transform 0.4s cubic-bezier(0.17, 0.67, 0.83, 0.67); 
-            z-index: 2; 
+            position: absolute; width: 240px; height: 240px; border: 15px solid var(--accent); 
+            border-radius: 50%; border-bottom-color: transparent; border-left-color: transparent; 
+            border-right-color: transparent; top: 0; transform: rotate(-135deg); 
+            transition: transform 0.4s ease-out; z-index: 2; 
         }
-        
-        #speedValue { 
-            font-size: 4.5rem; 
-            font-weight: 900; 
-            color: var(--text); 
-            line-height: 1; 
-            z-index: 10; 
-            margin-bottom: 5px;
-        }
-        
-        .unit { 
-            color: #5a6575; 
-            font-size: 1.1rem; 
-            font-weight: bold; 
-            position: absolute; 
-            bottom: 10px; 
-        }
-
-        /* Инфо-карточка */
-        .info-card { 
-            width: 100%; 
-            max-width: 320px; 
-            background: var(--sec); 
-            border-radius: 20px; 
-            padding: 15px; 
-            margin-top: 30px; 
-        }
-        
-        .info-row { 
-            display: flex; 
-            justify-content: space-between; 
-            padding: 10px 0; 
-            border-bottom: 1px solid rgba(255,255,255,0.05); 
-            font-size: 0.9rem; 
-        }
-        
+        #speedValue { font-size: 4.5rem; font-weight: 900; color: var(--text); line-height: 1; z-index: 10; margin-bottom: 5px;}
+        .unit { color: #5a6575; font-size: 1.1rem; font-weight: bold; position: absolute; bottom: 10px; }
+        .info-card { width: 100%; max-width: 320px; background: var(--sec); border-radius: 20px; padding: 15px; margin-top: 30px; }
+        .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; }
         .info-row:last-child { border: none; }
-        
-        .label { 
-            color: #5a6575; 
-            text-transform: uppercase; 
-            font-size: 0.7rem; 
-            letter-spacing: 1px;
-        }
-
-        /* Кнопка */
+        .label { color: #5a6575; text-transform: uppercase; font-size: 0.7rem; }
         .btn { 
-            margin-top: 30px; 
-            background: var(--accent); 
-            color: #000; 
-            border: none; 
-            width: 100%; 
-            max-width: 240px; 
-            height: 60px; 
-            border-radius: 30px; 
-            font-weight: 900; 
-            font-size: 1.1rem; 
-            cursor: pointer; 
-            transition: transform 0.1s;
-            box-shadow: 0 10px 20px rgba(0, 209, 255, 0.2);
+            margin-top: 30px; background: var(--accent); color: #000; border: none; 
+            width: 100%; max-width: 240px; height: 60px; border-radius: 30px; 
+            font-weight: 900; font-size: 1.1rem; cursor: pointer; 
         }
-        
-        .btn:active { transform: scale(0.96); }
-        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn:disabled { opacity: 0.4; }
     </style>
 </head>
 <body>
-
     <div class="gauge-wrapper">
         <div class="gauge-bg"></div>
         <div class="gauge-fill" id="gaugeProgress"></div>
         <span id="speedValue">0.0</span>
         <div class="unit">Mbps</div>
     </div>
-	<div class="info-card">
-        <div class="info-row">
-            <span class="label">IP Address</span>
-            <span id="ip">Loading...</span>
-        </div>
-        <div class="info-row">
-            <span class="label">Provider</span>
-            <span id="isp">Loading...</span>
-        </div>
+
+    <div class="info-card">
+        <div class="info-row"><span class="label">IP Address</span><span id="ip">Loading...</span></div>
+        <div class="info-row"><span class="label">Provider</span><span id="isp">Loading...</span></div>
     </div>
 
     <button class="btn" id="go">START TEST</button>
 
 <script>
     const tg = window.Telegram ? window.Telegram.WebApp : null;
-    if (tg) {
-        tg.expand();
-        tg.ready();
-    }
+    if (tg) { tg.expand(); tg.ready(); }
 
-    // Получаем информацию об IP и Провайдере
     async function getInfo() {
         try {
-            // Используем ipapi.co (он обычно не требует ключа для простых запросов)
             const res = await fetch('https://ipapi.co/json/');
             const d = await res.json();
             document.getElementById('ip').innerText = d.ip || "Unknown";
             document.getElementById('isp').innerText = d.org || "Unknown";
         } catch (e) {
-            document.getElementById('ip').innerText = "Not found";
-            document.getElementById('isp').innerText = "CORS / Offline";
+            document.getElementById('ip').innerText = "Error";
+            document.getElementById('isp').innerText = "Blocked";
         }
     }
 
@@ -181,25 +75,20 @@
         btn.innerText = "TESTING...";
         
         const xhr = new XMLHttpRequest();
-        const start = performance.now();
+		const start = performance.now();
         
-        // Добавляем timestamp, чтобы браузер не брал файл из кэша
-        xhr.open("GET", "test1.jpg?t=" + new Date().getTime(), true);
+        // Убедись, что файл test1.jpg лежит в той же папке на хостинге!
+        xhr.open("GET", "test1.jpg?t=" + Date.now(), true);
         
         xhr.onprogress = function(e) {
-            if (e.lengthComputable || e.loaded > 0) {
+            if (e.loaded > 0) {
                 const now = performance.now();
-                const duration = (now - start) / 1000; // перевод в секунды
-                
+                const duration = (now - start) / 1000;
                 if (duration > 0) {
-                    // Формула: (Байты * 8 бит) / 1024 / 1024 = Мегабиты
                     const mbps = ((e.loaded * 8) / (1024 * 1024) / duration).toFixed(1);
                     speedVal.innerText = mbps;
-                    
-                    // Анимация шкалы (макс. скорость для шкалы возьмем 100 Mbps)
-                    // -135deg это 0, +45deg это 100 (диапазон 180 градусов)
                     const rot = -135 + (Math.min(parseFloat(mbps), 100) * 1.8);
-                    fill.style.transform = rotate(${rot}deg);
+                    fill.style.transform = "rotate(" + rot + "deg)";
                 }
             }
         };
@@ -207,21 +96,18 @@
         xhr.onload = function() {
             btn.disabled = false;
             btn.innerText = "RETRY";
-            if (tg && tg.HapticFeedback) {
-                tg.HapticFeedback.notificationOccurred('success');
-            }
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
         };
 
         xhr.onerror = function() {
             btn.disabled = false;
-            btn.innerText = "ERROR";
-            alert("Connection error. Check test1.jpg path.");
+            btn.innerText = "START TEST";
+            alert("Ошибка: Не удалось загрузить тестовый файл (test1.jpg).");
         };
 
         xhr.send();
     };
 
-    // Запускаем инфо при старте
     getInfo();
 </script>
 </body>
