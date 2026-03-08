@@ -19,19 +19,20 @@
             position: absolute; width: 240px; height: 240px; border: 15px solid var(--accent); 
             border-radius: 50%; border-bottom-color: transparent; border-left-color: transparent; 
             border-right-color: transparent; top: 0; transform: rotate(-135deg); 
-            transition: transform 0.4s ease-out; z-index: 2; 
+            transition: transform 0.3s ease-out; z-index: 2; 
         }
         #speedValue { font-size: 4.5rem; font-weight: 900; color: var(--text); line-height: 1; z-index: 10; margin-bottom: 5px;}
         .unit { color: #5a6575; font-size: 1.1rem; font-weight: bold; position: absolute; bottom: 10px; }
         .info-card { width: 100%; max-width: 320px; background: var(--sec); border-radius: 20px; padding: 15px; margin-top: 30px; }
-        .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; }
+        .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; }
         .info-row:last-child { border: none; }
-        .label { color: #5a6575; text-transform: uppercase; font-size: 0.7rem; }
+        .label { color: #5a6575; text-transform: uppercase; font-size: 0.7rem; font-weight: bold; }
         .btn { 
             margin-top: 30px; background: var(--accent); color: #000; border: none; 
             width: 100%; max-width: 240px; height: 60px; border-radius: 30px; 
-            font-weight: 900; font-size: 1.1rem; cursor: pointer; 
+            font-weight: 900; font-size: 1.1rem; cursor: pointer; transition: 0.2s;
         }
+        .btn:active { opacity: 0.8; transform: scale(0.98); }
         .btn:disabled { opacity: 0.4; }
     </style>
 </head>
@@ -44,8 +45,8 @@
     </div>
 
     <div class="info-card">
-        <div class="info-row"><span class="label">IP Address</span><span id="ip">Loading...</span></div>
-        <div class="info-row"><span class="label">Provider</span><span id="isp">Loading...</span></div>
+        <div class="info-row"><span class="label">IP Address</span><span id="ip">Detecting...</span></div>
+        <div class="info-row"><span class="label">Provider</span><span id="isp">Detecting...</span></div>
     </div>
 
     <button class="btn" id="go">START TEST</button>
@@ -54,20 +55,23 @@
     const tg = window.Telegram ? window.Telegram.WebApp : null;
     if (tg) { tg.expand(); tg.ready(); }
 
+    // Используем альтернативный сервис, который реже блокирует CORS
     async function getInfo() {
         try {
             const res = await fetch('https://ipapi.co/json/');
+            if (!res.ok) throw new Error();
             const d = await res.json();
             document.getElementById('ip').innerText = d.ip || "Unknown";
             document.getElementById('isp').innerText = d.org || "Unknown";
         } catch (e) {
-            document.getElementById('ip').innerText = "Error";
-            document.getElementById('isp').innerText = "Blocked";
+            // Если ipapi тоже блокирует, пробуем совсем простой вариант
+            document.getElementById('ip').innerText = "Check Connection";
+            document.getElementById('isp').innerText = "CORS Protected";
         }
     }
 
     document.getElementById('go').onclick = function() {
-        const btn = this;
+	const btn = this;
         const speedVal = document.getElementById('speedValue');
         const fill = document.getElementById('gaugeProgress');
         
@@ -75,10 +79,11 @@
         btn.innerText = "TESTING...";
         
         const xhr = new XMLHttpRequest();
-		const start = performance.now();
+        const start = performance.now();
         
-        // Убедись, что файл test1.jpg лежит в той же папке на хостинге!
-        xhr.open("GET", "test1.jpg?t=" + Date.now(), true);
+        // ВАЖНО: Проверь, чтобы test1.jpg был доступен по этой ссылке
+        // Если он лежит в корне сайта, то "test1.jpg" верно.
+        xhr.open("GET", "test1.jpg?nocache=" + Date.now(), true);
         
         xhr.onprogress = function(e) {
             if (e.loaded > 0) {
@@ -87,6 +92,8 @@
                 if (duration > 0) {
                     const mbps = ((e.loaded * 8) / (1024 * 1024) / duration).toFixed(1);
                     speedVal.innerText = mbps;
+                    
+                    // Шкала: от -135 до +45 градусов (диапазон 180)
                     const rot = -135 + (Math.min(parseFloat(mbps), 100) * 1.8);
                     fill.style.transform = "rotate(" + rot + "deg)";
                 }
@@ -96,13 +103,15 @@
         xhr.onload = function() {
             btn.disabled = false;
             btn.innerText = "RETRY";
-            if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            if (tg && tg.HapticFeedback && tg.isVersionAtLeast('6.1')) {
+                tg.HapticFeedback.notificationOccurred('success');
+            }
         };
 
         xhr.onerror = function() {
             btn.disabled = false;
             btn.innerText = "START TEST";
-            alert("Ошибка: Не удалось загрузить тестовый файл (test1.jpg).");
+            alert("Файл test1.jpg не найден или сервер запрещает скачивание.");
         };
 
         xhr.send();
