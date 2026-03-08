@@ -8,16 +8,16 @@
     <style>
         :root { --bg: #0b0e14; --accent: #00d1ff; --text: #ffffff; --sec: #1f262f; }
         body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; overflow: hidden; }
-        .gauge { position: relative; width: 260px; height: 260px; display: flex; align-items: center; justify-content: center; border: 4px solid var(--sec); border-radius: 50%; }
+        .gauge { width: 250px; height: 250px; border: 3px solid var(--sec); border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; box-shadow: 0 0 20px rgba(0,209,255,0.05); }
         #speedText { font-size: 4.5rem; font-weight: 900; color: var(--accent); }
-        .unit { color: #5a6575; font-size: 1.2rem; position: absolute; bottom: 60px; }
+        .unit { color: #5a6575; font-size: 1.2rem; position: absolute; bottom: 50px; }
         .stats { display: flex; gap: 15px; margin-top: 30px; }
-        .stat-card { background: var(--sec); padding: 10px 25px; border-radius: 12px; text-align: center; min-width: 100px; }
-        .stat-label { font-size: 0.7rem; color: #5a6575; text-transform: uppercase; }
-        .stat-val { font-size: 1.1rem; font-weight: bold; display: block; }
-        .btn { margin-top: 40px; background: var(--accent); color: #000; border: none; padding: 18px 70px; border-radius: 35px; font-weight: 900; font-size: 1rem; cursor: pointer; transition: 0.2s; }
+        .stat-card { background: var(--sec); padding: 10px 20px; border-radius: 12px; text-align: center; min-width: 90px; }
+        .stat-label { font-size: 0.7rem; color: #5a6575; display: block; }
+        .stat-val { font-size: 1.1rem; font-weight: bold; }
+        .btn { margin-top: 40px; background: var(--accent); color: #000; border: none; padding: 18px 70px; border-radius: 35px; font-weight: 900; font-size: 1rem; cursor: pointer; }
         .btn:disabled { background: #333; color: #666; }
-        #log { margin-top: 15px; font-size: 0.7rem; color: #444; }
+        #status { margin-top: 15px; font-size: 0.7rem; color: #444; }
     </style>
 </head>
 <body>
@@ -29,28 +29,28 @@
 
     <div class="stats">
         <div class="stat-card">
-            <span class="stat-label">Ping</span>
-            <span class="stat-val" id="p">0 <small>ms</small></span>
+            <span class="stat-label">PING</span>
+            <span class="stat-val" id="p">0</span>
         </div>
         <div class="stat-card">
-            <span class="stat-label">Jitter</span>
-            <span class="stat-val" id="j">0 <small>ms</small></span>
+            <span class="stat-label">JITTER</span>
+            <span class="stat-val" id="j">0</span>
         </div>
     </div>
 
     <button class="btn" id="go">START</button>
-    <div id="log">Ready</div>
+    <div id="status">Ready</div>
 
 <script>
-    const tg = window.Telegram ? window.Telegram.WebApp : null;
     const btn = document.getElementById('go');
-    const log = document.getElementById('log');
+    const speedText = document.getElementById('speedText');
+    const status = document.getElementById('status');
 
-    // Функция Пинга (уже работает, оставляем)
+    // Пинг (работает стабильно)
     async function getPing() {
-        const starts = [];
-        for(let i=0; i<4; i++) {
-            const s = performance.now();
+        let starts = [];
+        for(let i=0; i<4; i++){
+            let s = performance.now();
             await fetch("test10mb.bin", {method:'HEAD', cache:'no-store'}).catch(()=>{});
             starts.push(performance.now()-s);
         }
@@ -63,46 +63,54 @@
     btn.onclick = async function() {
         btn.disabled = true;
         btn.innerText = "TESTING...";
-        log.innerText = "Measuring latency...";
+        status.innerText = "Connecting...";
 
+        // Показываем пинг
         const lat = await getPing();
-        document.getElementById('p').innerHTML = lat.p + " <small>ms</small>";
-        document.getElementById('j').innerHTML = lat.j + " <small>ms</small>";
+        document.getElementById('p').innerText = lat.p;
+        document.getElementById('j').innerText = lat.j;
 
-        log.innerText = "Downloading test file...";
+        status.innerText = "Downloading...";
         
-        const xhr = new XMLHttpRequest();
         const startTime = performance.now();
+        // ВАЖНО: Указываем размер файла в битах (10 МБ = 10 * 1024 * 1024 * 8)
+        const fileSizeInBits = 10 * 1024 * 1024 * 8; 
         
-        // Используем случайный параметр против кэша
-        xhr.open("GET", "test10mb.bin?v=" + Math.random(), true);
-        
-        xhr.onprogress = function(e) {
-            if (e.lengthComputable || e.loaded > 0) {
-                const now = performance.now();
-                const duration = (now - startTime) / 1000;
-                const mbps = ((e.loaded * 8) / (1024 * 1024) / duration).toFixed(1);
-                document.getElementById('speedText').innerText = mbps;
-            }
+        // ХАК: Используем Image для обхода блокировок скачивания
+        const download = new Image();
+        download.onload = function () {
+            const endTime = performance.now();
+            const duration = (endTime - startTime) / 1000;
+            const mbps = (fileSizeInBits / (1024 * 1024) / duration).toFixed(1);
+            speedText.innerText = mbps;
+            finish();
         };
 
-        xhr.onload = function() {
-            log.innerText = "Done!";
-            btn.innerText = "RETRY";
-            btn.disabled = false;
-            if(tg) tg.HapticFeedback.notificationOccurred('success');
+        download.onerror = function () {
+            // Если Image не сработал (бинарник не картинка), пробуем через обычный fetch, но без потока
+            fetch("test10mb.bin?t=" + Date.now()).then(r => r.blob()).then(() => {
+                const duration = (performance.now() - startTime) / 1000;
+                const mbps = (fileSizeInBits / (1024 * 1024) / duration).toFixed(1);
+                speedText.innerText = mbps;
+                finish();
+            }).catch(() => {
+                status.innerText = "Error loading file";
+                finish();
+            });
         };
 
-        xhr.onerror = function() {
-            log.innerText = "Error: Connection blocked";
-            btn.innerText = "ERROR";
-            btn.disabled = false;
-        };
-
-        xhr.send();
+        // Запускаем скачивание
+        download.src = "test10mb.bin?t=" + Date.now();
     };
 
-    if(tg) { tg.expand(); tg.ready(); }
+    function finish() {
+        btn.disabled = false;
+        btn.innerText = "RETRY";
+        status.innerText = "Done";
+        if(window.Telegram && window.Telegram.WebApp.HapticFeedback) {
+            window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+        }
+    }
 </script>
 </body>
 </html>
