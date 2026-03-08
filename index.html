@@ -6,18 +6,13 @@
     <title>BlueVPN Speedtest</title>
     <script src="https://telegram.org"></script>
     <style>
-        :root { --bg: #0b0e14; --accent: #00d1ff; --text: #ffffff; --sec: #1f262f; }
-        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; overflow: hidden; }
-        .gauge { width: 250px; height: 250px; border: 4px solid var(--sec); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
-        #speedText { font-size: 5rem; font-weight: 900; color: var(--accent); line-height: 1; }
+        body { background-color: #0b0e14; color: #ffffff; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        .gauge { width: 260px; height: 260px; border: 4px solid #1f262f; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        #speedText { font-size: 5rem; font-weight: 900; color: #00d1ff; line-height: 1; transition: 0.1s; }
         .unit { color: #5a6575; font-size: 1.1rem; font-weight: bold; margin-top: 5px; }
-        .stats { display: flex; gap: 12px; margin-top: 35px; width: 300px; }
-        .stat-card { background: var(--sec); flex: 1; padding: 12px; border-radius: 15px; text-align: center; }
-        .stat-label { font-size: 0.65rem; color: #5a6575; text-transform: uppercase; display: block; }
-        .stat-val { font-size: 1.2rem; font-weight: bold; }
-        .btn { margin-top: 45px; background: var(--accent); color: #000; border: none; padding: 20px 80px; border-radius: 40px; font-weight: 900; font-size: 1.1rem; cursor: pointer; }
-        .btn:disabled { background: #1f262f; color: #444; }
-        #status { margin-top: 15px; font-size: 0.7rem; color: #444; }
+        .btn { margin-top: 50px; background: #00d1ff; color: #000; border: none; padding: 20px 80px; border-radius: 40px; font-weight: 900; font-size: 1.1rem; cursor: pointer; box-shadow: 0 0 20px rgba(0,209,255,0.2); }
+        .btn:disabled { background: #1f262f; color: #444; box-shadow: none; }
+        #status { margin-top: 15px; font-size: 0.7rem; color: #444; height: 20px; }
     </style>
 </head>
 <body>
@@ -25,62 +20,74 @@
         <span id="speedText">0.0</span>
         <div class="unit">Mbps</div>
     </div>
-    <div class="stats">
-        <div class="stat-card"><span class="stat-label">Ping</span><span class="stat-val" id="p">0</span></div>
-        <div class="stat-card"><span class="stat-label">Jitter</span><span class="stat-val" id="j">0</span></div>
-    </div>
     <button class="btn" id="goBtn">START</button>
-    <div id="status">Global Engine</div>
+    <div id="status">Engine: Ready</div>
 
 <script>
     const goBtn = document.getElementById('goBtn');
     const speedText = document.getElementById('speedText');
     const status = document.getElementById('status');
 
-    // Прямая ссылка на файл 100МБ от Cloudflare. Больше ничего не добавляем к ней.
-    const TEST_URL = "https://speed.cloudflare.com";
-
-    goBtn.onclick = async function() {
+    goBtn.onclick = function() {
         goBtn.disabled = true;
         speedText.innerText = "0.0";
         status.innerText = "Testing...";
 
-        let totalBytes = 0;
+        const xhr = new XMLHttpRequest();
         const startTime = performance.now();
-        let lastUpdate = startTime;
-
-        try {
-            // Запускаем один поток скачивания
-            const response = await fetch(TEST_URL, { cache: 'no-store' });
-            const reader = response.body.getReader();
-
-            while (true) {
-                const {done, value} = await reader.read();
-                if (done) break;
-                
-                totalBytes += value.length;
-                const now = performance.now();
-                
-                if (now - lastUpdate > 150) {
-                    const duration = (now - startTime) / 1000;
-                    const mbps = ((totalBytes * 8) / (1024 * 1024) / duration).toFixed(1);
-                    speedText.innerText = mbps;
-                    lastUpdate = now;
-                }
+        
+        // Сначала пробуем test.jpg, так как он больше и точнее
+        xhr.open("GET", "test.jpg?nocache=" + Date.now(), true);
+        
+        xhr.onprogress = function(e) {
+            if (e.loaded > 0) {
+                const duration = (performance.now() - startTime) / 1000;
+                const mbps = ((e.loaded * 8) / (1024 * 1024) / duration) * 0.96;
+                speedText.innerText = mbps.toFixed(1);
             }
-            status.innerText = "Done";
-        } catch (e) {
-            console.error(e);
-            status.innerText = "Connection Error";
-        }
+        };
 
+        xhr.onload = function() {
+            status.innerText = "Test Finished";
+            finish();
+        };
+
+        xhr.onerror = function() {
+            // Если JPG не сработал, пробуем BIN
+            status.innerText = "Retrying with BIN...";
+            runBackup();
+        };
+
+        xhr.send();
+    };
+
+    function runBackup() {
+        const xhr = new XMLHttpRequest();
+        const startTime = performance.now();
+        xhr.open("GET", "test10mb.bin?t=" + Date.now(), true);
+        xhr.onprogress = function(e) {
+            if (e.loaded > 0) {
+                const duration = (performance.now() - startTime) / 1000;
+                const mbps = ((e.loaded * 8) / (1024 * 1024) / duration) * 0.96;
+                speedText.innerText = mbps.toFixed(1);
+            }
+        };
+        xhr.onload = finish;
+        xhr.send();
+    }
+
+    function finish() {
         goBtn.disabled = false;
         goBtn.innerText = "RETRY";
-        
         if(window.Telegram && window.Telegram.WebApp.HapticFeedback) {
             window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
         }
-    };
+    }
+
+    if(window.Telegram) {
+        window.Telegram.WebApp.expand();
+        window.Telegram.WebApp.ready();
+    }
 </script>
 </body>
 </html>
