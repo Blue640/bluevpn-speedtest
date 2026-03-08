@@ -4,11 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Speedtest</title>
+    <!-- Пытаемся загрузить, но если не выйдет — не страшно -->
     <script src="https://telegram.org"></script>
     <script src="https://cdn.jsdelivr.net"></script>
     <style>
         body {
-            background-color: #0b0e14; /* Глубокий темный как на скрине */
+            background-color: #0b0e14;
             color: #ffffff;
             font-family: sans-serif;
             display: flex;
@@ -17,46 +18,33 @@
             justify-content: center;
             height: 100vh;
             margin: 0;
-            overflow: hidden;
         }
         .speed-container {
             text-align: center;
-            position: relative;
-            width: 300px;
-            height: 300px;
+            width: 250px;
+            height: 250px;
+            border: 2px solid #1f262f;
+            border-radius: 50%;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            border: 2px solid #1f262f;
-            border-radius: 50%;
+            position: relative;
         }
-        .speed-value {
-            font-size: 4rem;
-            font-weight: bold;
-            color: #ffffff;
-        }
-        .unit {
-            color: #5a6575;
-            font-size: 1.2rem;
-        }
-        canvas {
-            position: absolute;
-            top: 0; left: 0;
-            z-index: -1;
-        }
+        .speed-value { font-size: 3.5rem; font-weight: bold; }
+        .unit { color: #5a6575; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
         .btn-start {
-            margin-top: 40px;
-            background: #00d1ff; /* Голубой акцент */
+            margin-top: 50px;
+            background: #00d1ff;
             color: #000;
             border: none;
-            padding: 15px 50px;
+            padding: 15px 60px;
             border-radius: 30px;
             font-weight: bold;
-            font-size: 1rem;
             cursor: pointer;
-            text-transform: uppercase;
+            z-index: 10; /* Кнопка точно сверху */
         }
-        .btn-start:disabled { opacity: 0.3; }
+        .btn-start:disabled { background: #333; color: #666; }
     </style>
 </head>
 <body>
@@ -67,53 +55,48 @@
         <canvas id="speedChart"></canvas>
     </div>
 
-    <button class="btn-start" id="startBtn">Старт</button>
+    <button class="btn-start" id="startBtn">СТАРТ</button>
 
 <script>
-    const tg = window.Telegram.WebApp;
-    const speedText = document.getElementById('speedText');
+    // 1. Сначала вешаем событие на кнопку, чтобы она работала СРАЗУ
     const startBtn = document.getElementById('startBtn');
-    const ctx = document.getElementById('speedChart').getContext('2d');
+    const speedText = document.getElementById('speedText');
 
-    // Настройка графика (прозрачный фон, синяя линия)
-    let chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                data: [],
-                borderColor: '#00d1ff',
-                borderWidth: 2,
-                pointRadius: 0,
-                fill: true,
-                backgroundColor: 'rgba(0, 209, 255, 0.1)',
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: { x: {display: false}, y: {display: false} },
-            plugins: { legend: {display: false} }
-        }
+    startBtn.addEventListener('click', function() {
+        console.log("Кнопка нажата!");
+        runTest();
     });
 
-    async function startSpeedTest() {
+    // 2. Безопасная инициализация графиков и ТГ
+    let chart = null;
+    try {
+        if (typeof Chart !== 'undefined') {
+            const ctx = document.getElementById('speedChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets: [{ data: [], borderColor: '#00d1ff', tension: 0.4, pointRadius: 0 }] },
+                options: { scales: { x: {display: false}, y: {display: false} }, plugins: {legend: {display: false}} }
+            });
+        }
+    } catch (e) { console.error("Chart error", e); }
+
+    const tg = window.Telegram ? window.Telegram.WebApp : null;
+    if (tg) { tg.expand(); tg.ready(); }
+
+    // 3. Функция теста
+    async function runTest() {
         startBtn.disabled = true;
-        startBtn.innerText = "Тест...";
+        startBtn.innerText = "ЗАМЕР...";
         
-        // Сброс данных
-        chart.data.labels = [];
-        chart.data.datasets[0].data = [];
-        chart.update();
-
-        const TEST_FILE = "./test10mb.bin"; // Убедись, что файл лежит в корне гитхаба!
-        const startTime = performance.now();
-
+        // Ссылка на файл (обязательно проверь, что он есть в корне GitHub!)
+        const TEST_FILE = "test10mb.bin"; 
+        
         try {
+            const startTime = performance.now();
             const response = await fetch(TEST_FILE + "?t=" + Date.now());
-            if (!response.ok) throw new Error();
             
+            if (!response.ok) throw new Error("File not found");
+
             const reader = response.body.getReader();
             let received = 0;
 
@@ -123,32 +106,25 @@
                 
                 received += value.length;
                 const now = performance.now();
-                const duration = (now - startTime) / 1000;
-                const mbps = ((received * 8) / (1024 * 1024) / duration).toFixed(1);
+                const mbps = ((received * 8) / (1024 * 1024) / ((now - startTime) / 1000)).toFixed(1);
                 
                 speedText.innerText = mbps;
-                
-                // Обновляем график раз в 5 итераций, чтобы не висло
-                if (chart.data.labels.length < 50) {
+
+                if (chart) {
                     chart.data.labels.push("");
                     chart.data.datasets[0].data.push(mbps);
                     chart.update('none');
                 }
             }
-            
-            startBtn.innerText = "Заново";
-            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-
+            startBtn.innerText = "ГОТОВО";
         } catch (e) {
-            alert("Файл test10mb.bin не найден в корне сайта!");
-            startBtn.innerText = "Ошибка";
+            alert("Ошибка: Загрузи файл test10mb.bin в репозиторий!");
+            startBtn.innerText = "ОШИБКА";
         }
         
         startBtn.disabled = false;
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
     }
-
-    startBtn.onclick = startSpeedTest;
-    tg.ready();
 </script>
 </body>
 </html>
