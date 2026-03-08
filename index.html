@@ -8,107 +8,96 @@
     <style>
         :root { --bg: #0b0e14; --accent: #00d1ff; --text: #ffffff; --sec: #1f262f; }
         body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .gauge { width: 280px; height: 280px; border: 4px solid var(--sec); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; transition: 0.3s; }
-        .gauge.active { border-color: var(--accent); box-shadow: 0 0 40px rgba(0, 209, 255, 0.15); }
-        #speedText { font-size: 5.5rem; font-weight: 900; color: var(--accent); line-height: 1; }
-        .unit { color: #5a6575; font-size: 1.2rem; font-weight: bold; margin-top: 5px; }
-        .stats { display: flex; gap: 15px; margin-top: 40px; width: 320px; }
-        .stat-card { background: var(--sec); flex: 1; padding: 15px; border-radius: 18px; text-align: center; }
-        .stat-label { font-size: 0.7rem; color: #5a6575; text-transform: uppercase; margin-bottom: 5px; display: block; }
-        .stat-val { font-size: 1.3rem; font-weight: bold; }
-        .btn { margin-top: 50px; background: var(--accent); color: #000; border: none; padding: 22px 90px; border-radius: 45px; font-weight: 900; font-size: 1.2rem; cursor: pointer; transition: 0.3s; }
+        .gauge { width: 260px; height: 260px; border: 4px solid var(--sec); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        #speedText { font-size: 5rem; font-weight: 900; color: var(--accent); line-height: 1; }
+        .unit { color: #5a6575; font-size: 1.1rem; font-weight: bold; margin-top: 5px; }
+        .stats { display: flex; gap: 12px; margin-top: 35px; width: 300px; }
+        .stat-card { background: var(--sec); flex: 1; padding: 12px; border-radius: 15px; text-align: center; }
+        .stat-label { font-size: 0.65rem; color: #5a6575; text-transform: uppercase; display: block; }
+        .stat-val { font-size: 1.2rem; font-weight: bold; }
+        .btn { margin-top: 45px; background: var(--accent); color: #000; border: none; padding: 20px 80px; border-radius: 40px; font-weight: 900; font-size: 1.1rem; cursor: pointer; }
         .btn:disabled { background: #1f262f; color: #444; }
-        #status { margin-top: 20px; font-size: 0.8rem; color: #444; height: 20px; }
+        #status { margin-top: 15px; font-size: 0.7rem; color: #333; }
     </style>
 </head>
 <body>
-    <div class="gauge" id="mainGauge">
+    <div class="gauge">
         <span id="speedText">0.0</span>
         <div class="unit">Mbps</div>
     </div>
-
     <div class="stats">
-        <div class="stat-card">
-            <span class="stat-label">Ping</span>
-            <span class="stat-val" id="p">0</span>
-        </div>
-        <div class="stat-card">
-            <span class="stat-label">Jitter</span>
-            <span class="stat-val" id="j">0</span>
-        </div>
+        <div class="stat-card"><span class="stat-label">Ping</span><span class="stat-val" id="p">0</span></div>
+        <div class="stat-card"><span class="stat-label">Jitter</span><span class="stat-val" id="j">0</span></div>
     </div>
-
     <button class="btn" id="goBtn">START TEST</button>
-    <div id="status">Ultra Mode (500MB)</div>
+    <div id="status">Global Server Engine</div>
 
 <script>
     const goBtn = document.getElementById('goBtn');
     const speedText = document.getElementById('speedText');
-    const gauge = document.getElementById('mainGauge');
     const status = document.getElementById('status');
 
-    // Список твоих файлов
-    const FILES = ["test1.bin", "test2.bin", "test3.bin", "test4.bin", "test5.bin"];
+    // Прямая ссылка на быстрый файл Cloudflare (100MB)
+    // Мы используем HTTPS, чтобы не было ошибок безопасности
+    const TEST_URL = "https://speed.cloudflare.com";
 
     async function measurePing() {
         let results = [];
         for(let i=0; i<4; i++){
             let s = performance.now();
-            await fetch(FILES[0], {method:'HEAD', cache:'no-store'}).catch(()=>{});
+            // Пингуем гугл или сам файл
+            await fetch("https://1.1.1.1", {mode:'no-cors', cache:'no-store'}).catch(()=>{});
             results.push(performance.now()-s);
         }
-        return {
-            p: Math.min(...results).toFixed(0),
-            j: (Math.max(...results) - Math.min(...results)).toFixed(0)
-        };
+        return { p: Math.min(...results).toFixed(0), j: (Math.max(...results) - Math.min(...results)).toFixed(0) };
     }
 
     goBtn.onclick = async function() {
         goBtn.disabled = true;
-        gauge.classList.add('active');
-        status.innerText = "Measuring latency...";
+        speedText.innerText = "0.0";
+        status.innerText = "Connecting to Global Node...";
         
         const lat = await measurePing();
         document.getElementById('p').innerText = lat.p;
         document.getElementById('j').innerText = lat.j;
 
-        status.innerText = "Downloading 500MB in 5 streams...";
+        status.innerText = "Testing via Cloudflare Edge...";
         
         let totalBytes = 0;
         const startTime = performance.now();
         let lastUpdate = startTime;
 
-        // Функция для одного потока
-        const startThread = async (fileName) => {
-            try {
-                const response = await fetch(fileName + "?v=" + Math.random());
+        try {
+            // Используем 2 параллельных потока к Cloudflare для точности
+            const startThread = async () => {
+                const response = await fetch(TEST_URL + "&t=" + Math.random());
                 const reader = response.body.getReader();
                 while (true) {
                     const {done, value} = await reader.read();
                     if (done) break;
                     totalBytes += value.length;
-                    
                     const now = performance.now();
-                    if (now - lastUpdate > 100) {
+                    if (now - lastUpdate > 120) {
                         const duration = (now - startTime) / 1000;
-                        // Считаем честный Mbps (умножаем на 0.95 для компенсации служебных данных)
+                        // Считаем Mbps. Cloudflare отдает чисто, коэффициент 0.95
                         const mbps = ((totalBytes * 8) / (1024 * 1024) / duration) * 0.95;
                         speedText.innerText = mbps.toFixed(1);
                         lastUpdate = now;
                     }
                 }
-            } catch (e) { console.error("Thread error", e); }
-        };
+            };
 
-        // Запускаем все 5 файлов одновременно
-        await Promise.all(FILES.map(file => startThread(file)));
+            await Promise.all([startThread(), startThread()]);
+
+        } catch (e) {
+            console.error(e);
+            status.innerText = "Error: Use a browser with CORS support";
+        }
 
         const finalDuration = (performance.now() - startTime) / 1000;
         const finalMbps = ((totalBytes * 8) / (1024 * 1024) / finalDuration) * 0.95;
-        
         speedText.innerText = finalMbps.toFixed(1);
         status.innerText = "Test Finished";
-        gauge.classList.remove('active');
         goBtn.disabled = false;
         goBtn.innerText = "RETRY";
 
