@@ -4,77 +4,202 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BlueVPN Speedtest</title>
-    <script src="https://telegram.org"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --bg: #0b0e14; --accent: #00d1ff; --text: #ffffff; --sec: #1f262f; }
-        body { background-color: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; overflow: hidden; }
-        .gauge-wrapper { position: relative; width: 280px; height: 160px; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
-        .gauge-bg { position: absolute; width: 240px; height: 240px; border: 15px solid var(--sec); border-radius: 50%; border-bottom-color: transparent; top: 0; transform: rotate(-45deg); }
-        .gauge-fill { position: absolute; width: 240px; height: 240px; border: 15px solid var(--accent); border-radius: 50%; border-bottom-color: transparent; border-left-color: transparent; border-right-color: transparent; top: 0; transform: rotate(-135deg); transition: transform 0.3s ease-out; z-index: 2; }
-        #speedValue { font-size: 4.5rem; font-weight: 900; color: var(--text); line-height: 1; z-index: 10; margin-bottom: 5px;}
-        .unit { color: #5a6575; font-size: 1.1rem; font-weight: bold; position: absolute; bottom: 10px; }
-        .info-card { width: 100%; max-width: 320px; background: var(--sec); border-radius: 20px; padding: 15px; margin-top: 30px; }
-        .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; }
+        :root { 
+            --bg: #0b0e14; 
+            --accent: #00d1ff; 
+            --text: #ffffff; 
+            --sec: #1f262f; 
+        }
+        
+        body { 
+            background-color: var(--bg); 
+            color: var(--text); 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            margin: 0; 
+            padding: 20px; 
+            overflow: hidden; 
+            user-select: none;
+        }
+
+        /* Спидометр */
+        .gauge-wrapper { 
+            position: relative; 
+            width: 280px; 
+            height: 160px; 
+            display: flex; 
+            align-items: flex-end; 
+            justify-content: center; 
+            overflow: hidden; 
+        }
+        
+        .gauge-bg { 
+            position: absolute; 
+            width: 240px; 
+            height: 240px; 
+            border: 15px solid var(--sec); 
+            border-radius: 50%; 
+            border-bottom-color: transparent; 
+            top: 0; 
+            transform: rotate(-45deg); 
+        }
+        
+        .gauge-fill { 
+            position: absolute; 
+            width: 240px; 
+            height: 240px; 
+            border: 15px solid var(--accent); 
+            border-radius: 50%; 
+            border-bottom-color: transparent; 
+            border-left-color: transparent; 
+            border-right-color: transparent; 
+            top: 0; 
+            transform: rotate(-135deg); 
+            transition: transform 0.4s cubic-bezier(0.17, 0.67, 0.83, 0.67); 
+            z-index: 2; 
+        }
+        
+        #speedValue { 
+            font-size: 4.5rem; 
+            font-weight: 900; 
+            color: var(--text); 
+            line-height: 1; 
+            z-index: 10; 
+            margin-bottom: 5px;
+        }
+        
+        .unit { 
+            color: #5a6575; 
+            font-size: 1.1rem; 
+            font-weight: bold; 
+            position: absolute; 
+            bottom: 10px; 
+        }
+
+        /* Инфо-карточка */
+        .info-card { 
+            width: 100%; 
+            max-width: 320px; 
+            background: var(--sec); 
+            border-radius: 20px; 
+            padding: 15px; 
+            margin-top: 30px; 
+        }
+        
+        .info-row { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 10px 0; 
+            border-bottom: 1px solid rgba(255,255,255,0.05); 
+            font-size: 0.9rem; 
+        }
+        
         .info-row:last-child { border: none; }
-        .label { color: #5a6575; text-transform: uppercase; font-size: 0.7rem; }
-        .btn { margin-top: 30px; background: var(--accent); color: #000; border: none; width: 100%; max-width: 240px; height: 60px; border-radius: 30px; font-weight: 900; font-size: 1.1rem; cursor: pointer; }
-        .btn:disabled { opacity: 0.4; }
+        
+        .label { 
+            color: #5a6575; 
+            text-transform: uppercase; 
+            font-size: 0.7rem; 
+            letter-spacing: 1px;
+        }
+
+        /* Кнопка */
+        .btn { 
+            margin-top: 30px; 
+            background: var(--accent); 
+            color: #000; 
+            border: none; 
+            width: 100%; 
+            max-width: 240px; 
+            height: 60px; 
+            border-radius: 30px; 
+            font-weight: 900; 
+            font-size: 1.1rem; 
+            cursor: pointer; 
+            transition: transform 0.1s;
+            box-shadow: 0 10px 20px rgba(0, 209, 255, 0.2);
+        }
+        
+        .btn:active { transform: scale(0.96); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
     </style>
 </head>
 <body>
+
     <div class="gauge-wrapper">
         <div class="gauge-bg"></div>
         <div class="gauge-fill" id="gaugeProgress"></div>
         <span id="speedValue">0.0</span>
         <div class="unit">Mbps</div>
     </div>
-
-    <div class="info-card">
-        <div class="info-row"><span class="label">IP Address</span><span id="ip">Loading...</span></div>
-        <div class="info-row"><span class="label">Provider</span><span id="isp">Loading...</span></div>
+	<div class="info-card">
+        <div class="info-row">
+            <span class="label">IP Address</span>
+            <span id="ip">Loading...</span>
+        </div>
+        <div class="info-row">
+            <span class="label">Provider</span>
+            <span id="isp">Loading...</span>
+        </div>
     </div>
 
-    <button class="btn" id="go">START</button>
+    <button class="btn" id="go">START TEST</button>
 
 <script>
     const tg = window.Telegram ? window.Telegram.WebApp : null;
-    if (tg) { tg.expand(); tg.ready(); }
+    if (tg) {
+        tg.expand();
+        tg.ready();
+    }
 
-    // 1. Получаем IP и Провайдера через более лояльный сервис
+    // Получаем информацию об IP и Провайдере
     async function getInfo() {
         try {
-            const res = await fetch('https://ipinfo.io'); // Публичный токен для тестов
+            // Используем ipapi.co (он обычно не требует ключа для простых запросов)
+            const res = await fetch('https://ipapi.co/json/');
             const d = await res.json();
             document.getElementById('ip').innerText = d.ip || "Unknown";
             document.getElementById('isp').innerText = d.org || "Unknown";
         } catch (e) {
-            document.getElementById('ip').innerText = "Blocked";
-            document.getElementById('isp').innerText = "CORS Error";
+            document.getElementById('ip').innerText = "Not found";
+            document.getElementById('isp').innerText = "CORS / Offline";
         }
     }
 
-    // 2. Замер скорости через XHR (самый надежный для Telegram)
     document.getElementById('go').onclick = function() {
         const btn = this;
-        btn.disabled = true;
         const speedVal = document.getElementById('speedValue');
         const fill = document.getElementById('gaugeProgress');
+        
+        btn.disabled = true;
+        btn.innerText = "TESTING...";
         
         const xhr = new XMLHttpRequest();
         const start = performance.now();
         
-        // Используем твой test1.jpg
-        xhr.open("GET", "test1.jpg?t=" + Date.now(), true);
+        // Добавляем timestamp, чтобы браузер не брал файл из кэша
+        xhr.open("GET", "test1.jpg?t=" + new Date().getTime(), true);
         
         xhr.onprogress = function(e) {
             if (e.lengthComputable || e.loaded > 0) {
                 const now = performance.now();
-                const duration = (now - start) / 1000;
+                const duration = (now - start) / 1000; // перевод в секунды
+                
                 if (duration > 0) {
+                    // Формула: (Байты * 8 бит) / 1024 / 1024 = Мегабиты
                     const mbps = ((e.loaded * 8) / (1024 * 1024) / duration).toFixed(1);
                     speedVal.innerText = mbps;
-                    const rot = -135 + (Math.min(mbps, 100) * 1.8);
-                    fill.style.transform = `rotate(${rot}deg)`;
+                    
+                    // Анимация шкалы (макс. скорость для шкалы возьмем 100 Mbps)
+                    // -135deg это 0, +45deg это 100 (диапазон 180 градусов)
+                    const rot = -135 + (Math.min(parseFloat(mbps), 100) * 1.8);
+                    fill.style.transform = rotate(${rot}deg);
                 }
             }
         };
@@ -82,12 +207,21 @@
         xhr.onload = function() {
             btn.disabled = false;
             btn.innerText = "RETRY";
-            if (tg) tg.HapticFeedback.notificationOccurred('success');
+            if (tg && tg.HapticFeedback) {
+                tg.HapticFeedback.notificationOccurred('success');
+            }
+        };
+
+        xhr.onerror = function() {
+            btn.disabled = false;
+            btn.innerText = "ERROR";
+            alert("Connection error. Check test1.jpg path.");
         };
 
         xhr.send();
     };
 
+    // Запускаем инфо при старте
     getInfo();
 </script>
 </body>
