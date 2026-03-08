@@ -3,29 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BlueVPN Speedtest Pro</title>
+    <title>BlueVPN Speedtest</title>
     <script src="https://telegram.org"></script>
     <style>
         :root { --bg: #0b0e14; --accent: #00d1ff; --text: #ffffff; --sec: #1f262f; --gray: #5a6575; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; overflow: hidden; }
         
-        .gauge-wrapper { position: relative; width: 300px; height: 200px; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; margin-bottom: 20px; }
-        .gauge-bg { position: absolute; width: 280px; height: 280px; border: 18px solid var(--sec); border-radius: 50%; border-bottom-color: transparent; top: 0; transform: rotate(-45deg); }
-        .gauge-fill { position: absolute; width: 280px; height: 280px; border: 18px solid var(--accent); border-radius: 50%; border-bottom-color: transparent; border-left-color: transparent; border-right-color: transparent; top: 0; transform: rotate(-135deg); transition: transform 0.4s ease-out; z-index: 2; }
+        .gauge-wrapper { position: relative; width: 300px; height: 180px; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
+        .gauge-bg { position: absolute; width: 260px; height: 260px; border: 15px solid var(--sec); border-radius: 50%; border-bottom-color: transparent; top: 0; transform: rotate(-45deg); }
+        .gauge-fill { position: absolute; width: 260px; height: 260px; border: 15px solid var(--accent); border-radius: 50%; border-bottom-color: transparent; border-left-color: transparent; border-right-color: transparent; top: 0; transform: rotate(-135deg); transition: transform 0.3s ease-out; z-index: 2; }
         
-        .speed-info { text-align: center; z-index: 10; }
-        #speedValue { font-size: 5rem; font-weight: 900; color: var(--text); line-height: 1; display: block; }
+        .speed-info { text-align: center; z-index: 10; padding-bottom: 10px; }
+        #speedValue { font-size: 5rem; font-weight: 900; color: var(--text); line-height: 1; }
         .unit { color: var(--gray); font-size: 1.2rem; font-weight: bold; }
 
-        .network-card { width: 100%; max-width: 340px; background: var(--sec); border-radius: 20px; padding: 15px; margin-top: 20px; }
-        .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .network-card { width: 100%; max-width: 320px; background: var(--sec); border-radius: 20px; padding: 15px; margin-top: 20px; }
+        .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; }
         .info-row:last-child { border-bottom: none; }
-        .label { color: var(--gray); font-size: 0.7rem; text-transform: uppercase; font-weight: 700; }
-        .value { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+        .label { color: var(--gray); text-transform: uppercase; font-size: 0.7rem; }
 
-        .btn-start { margin-top: 30px; background: var(--accent); color: #000; border: none; width: 100%; max-width: 280px; height: 60px; border-radius: 30px; font-size: 1.2rem; font-weight: 900; cursor: pointer; text-transform: uppercase; }
-        .btn-start:disabled { background: #1f262f; color: #444; }
+        .btn-start { margin-top: 30px; background: var(--accent); color: #000; border: none; width: 100%; max-width: 250px; height: 60px; border-radius: 30px; font-size: 1.2rem; font-weight: 900; cursor: pointer; }
+        .btn-start:disabled { opacity: 0.4; }
     </style>
 </head>
 <body>
@@ -40,12 +38,11 @@
     </div>
 
     <div class="network-card">
-        <div class="info-row"><span class="label">IP Address</span><span class="value" id="userIp">...</span></div>
-        <div class="info-row"><span class="label">Provider</span><span class="value" id="userIsp">...</span></div>
-        <div class="info-row"><span class="label">Location</span><span class="value" id="userLoc">...</span></div>
+        <div class="info-row"><span class="label">IP Address</span><span id="uIp">...</span></div>
+        <div class="info-row"><span class="label">Provider</span><span id="uIsp">...</span></div>
     </div>
 
-    <button class="btn-start" id="goBtn">START TEST</button>
+    <button class="btn-start" id="goBtn">START</button>
 
 <script>
     const tg = window.Telegram ? window.Telegram.WebApp : null;
@@ -53,23 +50,18 @@
     const gaugeProgress = document.getElementById('gaugeProgress');
     const goBtn = document.getElementById('goBtn');
 
-    // Настройка стрелки
     function updateGauge(mbps) {
         const degrees = -135 + (Math.min(mbps, 100) * 1.8);
         gaugeProgress.style.transform = `rotate(${degrees}deg)`;
     }
 
-    // Правильное получение инфо о сети
     async function getNetwork() {
         try {
             const res = await fetch('https://ipapi.co');
             const d = await res.json();
-            document.getElementById('userIp').innerText = d.ip;
-            document.getElementById('userIsp').innerText = d.org;
-            document.getElementById('userLoc').innerText = d.city + ', ' + d.country;
-        } catch (e) {
-            document.getElementById('userIp').innerText = "Network Error";
-        }
+            document.getElementById('uIp').innerText = d.ip;
+            document.getElementById('uIsp').innerText = d.org;
+        } catch (e) { document.getElementById('uIp').innerText = "Network Error"; }
     }
 
     goBtn.onclick = async function() {
@@ -77,60 +69,35 @@
         speedValue.innerText = "0.0";
         updateGauge(0);
 
-        const FILES = ["test1.jpg", "test2.jpg", "test3.jpg", "test4.jpg", "test5.jpg"];
-        let totalLoaded = 0;
+        // Используем один самый большой файл
+        const TEST_FILE = "test1.jpg"; 
         const startTime = performance.now();
+        let lastUpdate = startTime;
 
-        // Запускаем 5 потоков одновременно
-        const threads = FILES.map(file => {
-            return new Promise((resolve) => {
-                const xhr = new XMLHttpRequest();
-                xhr.open("GET", file + "?n=" + Math.random(), true);
-                xhr.onprogress = (e) => {
-                    if (e.loaded) {
-                        // Мы не можем точно знать прогресс всех файлов сразу в xhr, 
-                        // поэтому используем примерный расчет на основе времени
-                        const now = performance.now();
-                        const duration = (now - startTime) / 1000;
-                        // Здесь мы будем обновлять скорость чуть позже, когда данные накопятся
-                    }
-                };
-                // Чтобы видеть прогресс в реальном времени, используем интервал
-                xhr.onload = resolve;
-                xhr.send();
-            });
-        });
-
-        const interval = setInterval(() => {
-            const now = performance.now();
-            const duration = (now - startTime) / 1000;
-            // Костыль для замера через XHR в многопотоке: используем performance.getEntries
-            const entries = performance.getEntriesByName(window.location.origin + "/test", false);
-            // Для простоты и точности: считаем Mbps только по завершению или через fetch
-        }, 100);
-
-        // Переписываем на Fetch для реального многопотока и точности
-        const downloadFile = async (name) => {
-            const response = await fetch(name + "?t=" + Date.now());
+        try {
+            const response = await fetch(TEST_FILE + "?t=" + Date.now());
             const reader = response.body.getReader();
+            let loaded = 0;
+
             while (true) {
                 const {done, value} = await reader.read();
                 if (done) break;
-                totalLoaded += value.length;
-                const mbps = ((totalBytesToMbps(totalLoaded, performance.now() - startTime)));
-                speedValue.innerText = mbps;
-                updateGauge(parseFloat(mbps));
+                
+                loaded += value.length;
+                const now = performance.now();
+                
+                // Обновляем раз в 200мс, чтобы не «душить» поток вычислениями
+                if (now - lastUpdate > 200) {
+                    const duration = (now - startTime) / 1000;
+                    // Рассчитываем Mbps БЕЗ понижающих коэффициентов, чтобы увидеть максимум
+                    const mbps = ((loaded * 8) / (1024 * 1024) / duration);
+                    
+                    speedValue.innerText = mbps.toFixed(1);
+                    updateGauge(mbps);
+                    lastUpdate = now;
+                }
             }
-        };
-
-        function totalBytesToMbps(bytes, ms) {
-            const sec = ms / 1000;
-            return ((bytes * 8) / (1024 * 1024) / sec * 0.85).toFixed(1);
-        }
-
-        try {
-            await Promise.all(FILES.map(f => downloadFile(f)));
-        } catch(e) {}
+        } catch(e) { alert("Ошибка замера"); }
 
         goBtn.disabled = false;
         goBtn.innerText = "RETRY";
