@@ -3,172 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Speedtest Mini App</title>
-    <!-- Подключаем SDK Telegram и Chart.js -->
+    <title>Speedtest</title>
     <script src="https://telegram.org"></script>
     <script src="https://cdn.jsdelivr.net"></script>
     <style>
-        :root {
-            --bg-color: #1c1c1e;
-            --text-color: #ffffff;
-            --accent-color: #34c759;
-            --button-color: #007aff;
-        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--tg-theme-bg-color, var(--bg-color));
-            color: var(--tg-theme-text-color, var(--text-color));
+            background-color: #0b0e14; /* Глубокий темный как на скрине */
+            color: #ffffff;
+            font-family: sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
             margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
+            overflow: hidden;
         }
-        .card {
-            background: var(--tg-theme-secondary-bg-color, #2c2c2e);
-            border-radius: 20px;
-            padding: 30px;
-            width: 100%;
-            max-width: 400px;
+        .speed-container {
             text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            position: relative;
+            width: 300px;
+            height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border: 2px solid #1f262f;
+            border-radius: 50%;
         }
         .speed-value {
-            font-size: 5rem;
-            font-weight: 800;
-            margin: 10px 0;
-            color: var(--accent-color);
-            line-height: 1;
+            font-size: 4rem;
+            font-weight: bold;
+            color: #ffffff;
         }
-        .unit { font-size: 1.2rem; color: #8e8e93; font-weight: 500; }
-        .chart-container { width: 100%; height: 150px; margin-top: 20px; }
-        button {
-            background-color: var(--tg-theme-button-color, var(--button-color));
-            color: var(--tg-theme-button-text-color, #ffffff);
+        .unit {
+            color: #5a6575;
+            font-size: 1.2rem;
+        }
+        canvas {
+            position: absolute;
+            top: 0; left: 0;
+            z-index: -1;
+        }
+        .btn-start {
+            margin-top: 40px;
+            background: #00d1ff; /* Голубой акцент */
+            color: #000;
             border: none;
-            width: 100%;
-            padding: 18px;
-            border-radius: 15px;
-            font-size: 1.1rem;
-            font-weight: 600;
+            padding: 15px 50px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 1rem;
             cursor: pointer;
-            margin-top: 25px;
-            transition: opacity 0.2s;
+            text-transform: uppercase;
         }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-start:disabled { opacity: 0.3; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <div class="unit">Download</div>
-    <div class="speed-value" id="speed">0.0</div>
-    <div class="unit">Mbps</div>
-    
-    <div class="chart-container">
+    <div class="speed-container">
+        <div class="speed-value" id="speedText">0.0</div>
+        <div class="unit">Mbps</div>
         <canvas id="speedChart"></canvas>
     </div>
-    
-    <button id="startBtn">START TEST</button>
-</div>
+
+    <button class="btn-start" id="startBtn">Старт</button>
 
 <script>
     const tg = window.Telegram.WebApp;
-    tg.expand();
-    tg.ready();
-
-    const speedEl = document.getElementById('speed');
+    const speedText = document.getElementById('speedText');
     const startBtn = document.getElementById('startBtn');
     const ctx = document.getElementById('speedChart').getContext('2d');
 
+    // Настройка графика (прозрачный фон, синяя линия)
     let chart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: [],
             datasets: [{
                 data: [],
-                borderColor: '#34c759',
-                borderWidth: 3,
-                tension: 0.4,
+                borderColor: '#00d1ff',
+                borderWidth: 2,
                 pointRadius: 0,
                 fill: true,
-                backgroundColor: 'rgba(52, 199, 89, 0.1)'
+                backgroundColor: 'rgba(0, 209, 255, 0.1)',
+                tension: 0.4
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: { 
-                y: { display: false, beginAtZero: true }, 
-                x: { display: false } 
-            },
-            plugins: { legend: { display: false } }
+            scales: { x: {display: false}, y: {display: false} },
+            plugins: { legend: {display: false} }
         }
     });
 
-    async function runTest() {
+    async function startSpeedTest() {
         startBtn.disabled = true;
-        startBtn.innerText = "TESTING...";
+        startBtn.innerText = "Тест...";
         
-        // Сбрасываем график
+        // Сброс данных
         chart.data.labels = [];
         chart.data.datasets[0].data = [];
         chart.update();
 
-        // Укажите здесь имя вашего файла на GitHub (10MB-100MB)
-        const TEST_FILE_URL = "./test10mb.bin"; 
-        
+        const TEST_FILE = "./test10mb.bin"; // Убедись, что файл лежит в корне гитхаба!
         const startTime = performance.now();
-        let lastUpdateTime = startTime;
 
         try {
-            const response = await fetch(TEST_FILE_URL + "?nocache=" + Date.now());
-            if (!response.ok) throw new Error('File not found');
+            const response = await fetch(TEST_FILE + "?t=" + Date.now());
+            if (!response.ok) throw new Error();
             
             const reader = response.body.getReader();
-            let loadedBytes = 0;
+            let received = 0;
 
             while (true) {
                 const {done, value} = await reader.read();
                 if (done) break;
                 
-                loadedBytes += value.length;
+                received += value.length;
                 const now = performance.now();
+                const duration = (now - startTime) / 1000;
+                const mbps = ((received * 8) / (1024 * 1024) / duration).toFixed(1);
                 
-                // Обновляем график каждые 100мс, чтобы не тормозило
-                if (now - lastUpdateTime > 100) {
-                    const durationInSeconds = (now - startTime) / 1000;
-                    const mbps = ((loadedBytes * 8) / (1024 * 1024) / durationInSeconds).toFixed(1);
-                    
-                    speedEl.innerText = mbps;
+                speedText.innerText = mbps;
+                
+                // Обновляем график раз в 5 итераций, чтобы не висло
+                if (chart.data.labels.length < 50) {
                     chart.data.labels.push("");
                     chart.data.datasets[0].data.push(mbps);
                     chart.update('none');
-                    lastUpdateTime = now;
                 }
             }
-
-            const totalDuration = (performance.now() - startTime) / 1000;
-            const finalMbps = ((loadedBytes * 8) / (1024 * 1024) / totalDuration).toFixed(1);
             
-            speedEl.innerText = finalMbps;
-            startBtn.innerText = "RETRY";
+            startBtn.innerText = "Заново";
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
 
         } catch (e) {
-            console.error(e);
-            alert("Ошибка: Убедитесь, что файл test10mb.bin загружен на GitHub");
-            startBtn.innerText = "ERROR";
+            alert("Файл test10mb.bin не найден в корне сайта!");
+            startBtn.innerText = "Ошибка";
         }
         
         startBtn.disabled = false;
     }
 
-    startBtn.onclick = runTest;
+    startBtn.onclick = startSpeedTest;
+    tg.ready();
 </script>
-
 </body>
 </html>
