@@ -3,114 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BlueVPN Speedtest</title>
+    <title>BlueVPN Speedtest Ultra</title>
     <script src="https://telegram.org"></script>
     <style>
         :root { --bg: #0b0e14; --accent: #00d1ff; --text: #ffffff; --sec: #1f262f; }
-        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; overflow: hidden; }
-        .gauge { width: 250px; height: 250px; border: 3px solid var(--sec); border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; box-shadow: 0 0 20px rgba(0,209,255,0.05); }
-        #speedText { font-size: 4.5rem; font-weight: 900; color: var(--accent); }
-        .unit { color: #5a6575; font-size: 1.2rem; position: absolute; bottom: 50px; }
-        .stats { display: flex; gap: 15px; margin-top: 30px; }
-        .stat-card { background: var(--sec); padding: 10px 20px; border-radius: 12px; text-align: center; min-width: 90px; }
-        .stat-label { font-size: 0.7rem; color: #5a6575; display: block; }
-        .stat-val { font-size: 1.1rem; font-weight: bold; }
-        .btn { margin-top: 40px; background: var(--accent); color: #000; border: none; padding: 18px 70px; border-radius: 35px; font-weight: 900; font-size: 1rem; cursor: pointer; }
-        .btn:disabled { background: #333; color: #666; }
-        #status { margin-top: 15px; font-size: 0.7rem; color: #444; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .gauge { width: 280px; height: 280px; border: 4px solid var(--sec); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; transition: 0.3s; }
+        .gauge.active { border-color: var(--accent); box-shadow: 0 0 40px rgba(0, 209, 255, 0.15); }
+        #speedText { font-size: 5.5rem; font-weight: 900; color: var(--accent); line-height: 1; }
+        .unit { color: #5a6575; font-size: 1.2rem; font-weight: bold; margin-top: 5px; }
+        .stats { display: flex; gap: 15px; margin-top: 40px; width: 320px; }
+        .stat-card { background: var(--sec); flex: 1; padding: 15px; border-radius: 18px; text-align: center; }
+        .stat-label { font-size: 0.7rem; color: #5a6575; text-transform: uppercase; margin-bottom: 5px; display: block; }
+        .stat-val { font-size: 1.3rem; font-weight: bold; }
+        .btn { margin-top: 50px; background: var(--accent); color: #000; border: none; padding: 22px 90px; border-radius: 45px; font-weight: 900; font-size: 1.2rem; cursor: pointer; transition: 0.3s; }
+        .btn:disabled { background: #1f262f; color: #444; }
+        #status { margin-top: 20px; font-size: 0.8rem; color: #444; height: 20px; }
     </style>
 </head>
 <body>
-
-    <div class="gauge">
+    <div class="gauge" id="mainGauge">
         <span id="speedText">0.0</span>
         <div class="unit">Mbps</div>
     </div>
 
     <div class="stats">
         <div class="stat-card">
-            <span class="stat-label">PING</span>
+            <span class="stat-label">Ping</span>
             <span class="stat-val" id="p">0</span>
         </div>
         <div class="stat-card">
-            <span class="stat-label">JITTER</span>
+            <span class="stat-label">Jitter</span>
             <span class="stat-val" id="j">0</span>
         </div>
     </div>
 
-    <button class="btn" id="go">START</button>
-    <div id="status">Ready</div>
+    <button class="btn" id="goBtn">START TEST</button>
+    <div id="status">Ultra Mode (500MB)</div>
 
 <script>
-    const btn = document.getElementById('go');
+    const goBtn = document.getElementById('goBtn');
     const speedText = document.getElementById('speedText');
+    const gauge = document.getElementById('mainGauge');
     const status = document.getElementById('status');
 
-    // Пинг (работает стабильно)
-    async function getPing() {
-        let starts = [];
+    // Список твоих файлов
+    const FILES = ["test1.bin", "test2.bin", "test3.bin", "test4.bin", "test5.bin"];
+
+    async function measurePing() {
+        let results = [];
         for(let i=0; i<4; i++){
             let s = performance.now();
-            await fetch("test10mb.bin", {method:'HEAD', cache:'no-store'}).catch(()=>{});
-            starts.push(performance.now()-s);
+            await fetch(FILES[0], {method:'HEAD', cache:'no-store'}).catch(()=>{});
+            results.push(performance.now()-s);
         }
-        return { 
-            p: (starts.reduce((a,b)=>a+b)/4).toFixed(0),
-            j: (Math.max(...starts)-Math.min(...starts)).toFixed(0)
+        return {
+            p: Math.min(...results).toFixed(0),
+            j: (Math.max(...results) - Math.min(...results)).toFixed(0)
         };
     }
 
-    btn.onclick = async function() {
-        btn.disabled = true;
-        btn.innerText = "TESTING...";
-        status.innerText = "Connecting...";
-
-        // Показываем пинг
-        const lat = await getPing();
+    goBtn.onclick = async function() {
+        goBtn.disabled = true;
+        gauge.classList.add('active');
+        status.innerText = "Measuring latency...";
+        
+        const lat = await measurePing();
         document.getElementById('p').innerText = lat.p;
         document.getElementById('j').innerText = lat.j;
 
-        status.innerText = "Downloading...";
+        status.innerText = "Downloading 500MB in 5 streams...";
         
+        let totalBytes = 0;
         const startTime = performance.now();
-        // ВАЖНО: Указываем размер файла в битах (10 МБ = 10 * 1024 * 1024 * 8)
-        const fileSizeInBits = 10 * 1024 * 1024 * 8; 
+        let lastUpdate = startTime;
+
+        // Функция для одного потока
+        const startThread = async (fileName) => {
+            try {
+                const response = await fetch(fileName + "?v=" + Math.random());
+                const reader = response.body.getReader();
+                while (true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    totalBytes += value.length;
+                    
+                    const now = performance.now();
+                    if (now - lastUpdate > 100) {
+                        const duration = (now - startTime) / 1000;
+                        // Считаем честный Mbps (умножаем на 0.95 для компенсации служебных данных)
+                        const mbps = ((totalBytes * 8) / (1024 * 1024) / duration) * 0.95;
+                        speedText.innerText = mbps.toFixed(1);
+                        lastUpdate = now;
+                    }
+                }
+            } catch (e) { console.error("Thread error", e); }
+        };
+
+        // Запускаем все 5 файлов одновременно
+        await Promise.all(FILES.map(file => startThread(file)));
+
+        const finalDuration = (performance.now() - startTime) / 1000;
+        const finalMbps = ((totalBytes * 8) / (1024 * 1024) / finalDuration) * 0.95;
         
-        // ХАК: Используем Image для обхода блокировок скачивания
-        const download = new Image();
-        download.onload = function () {
-            const endTime = performance.now();
-            const duration = (endTime - startTime) / 1000;
-            const mbps = (fileSizeInBits / (1024 * 1024) / duration).toFixed(1);
-            speedText.innerText = mbps;
-            finish();
-        };
+        speedText.innerText = finalMbps.toFixed(1);
+        status.innerText = "Test Finished";
+        gauge.classList.remove('active');
+        goBtn.disabled = false;
+        goBtn.innerText = "RETRY";
 
-        download.onerror = function () {
-            // Если Image не сработал (бинарник не картинка), пробуем через обычный fetch, но без потока
-            fetch("test10mb.bin?t=" + Date.now()).then(r => r.blob()).then(() => {
-                const duration = (performance.now() - startTime) / 1000;
-                const mbps = (fileSizeInBits / (1024 * 1024) / duration).toFixed(1);
-                speedText.innerText = mbps;
-                finish();
-            }).catch(() => {
-                status.innerText = "Error loading file";
-                finish();
-            });
-        };
-
-        // Запускаем скачивание
-        download.src = "test10mb.bin?t=" + Date.now();
-    };
-
-    function finish() {
-        btn.disabled = false;
-        btn.innerText = "RETRY";
-        status.innerText = "Done";
         if(window.Telegram && window.Telegram.WebApp.HapticFeedback) {
             window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
         }
-    }
+    };
 </script>
 </body>
 </html>
